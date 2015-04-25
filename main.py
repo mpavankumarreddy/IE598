@@ -99,7 +99,7 @@ def configuration_model_connect(G, n, m, l, r):
                 aij = task.label
             else:
                 aij = -task.label
-            G.add_edge(worker, task, msg_t_w = None, msg_w_t = None, log_msg_t_w = None, log_msg_w_t = None, Aij = aij, t_id = nl[j], w_id = mr[j])
+            G.add_edge(worker, task, msg_t_w = None, msg_w_t = None, Aij = aij, t_id = nl[j], w_id = mr[j])
 
 print 'Generating random graph here'
 configuration_model_connect(G, n, m, l, r)
@@ -129,15 +129,15 @@ t_vals = [t_ne, t_eq]
 for e in G.edges_iter(data=True):
     # update msg_t_w to be lookup table of 2 value and initialise these messages to 1
     # WARNING: here [1, 1] corresponds to -1 and 1 values of ti. Didnot make it a dict for performance reasons
-    e[2]['msg_t_w'] = numpy.array([1.0, 1.0])
+    e[2]['msg_t_w'] = numpy.array([1.0/2, 1.0/2])
     # update msg_w_t to be lookup table of domain_size_p and no initialisation required here
     # sorted keys order
-    e[2]['msg_w_t'] = numpy.array([1.0]*domain_size_p)
+    e[2]['msg_w_t'] = numpy.array([1.0/domain_size_p]*domain_size_p)
 
 
 def worker_to_task():
     # one bp loop - later incorporate into a while loop
-    print 'worker to task'
+    #print 'worker to task'
     for e in G.edges_iter(data=True):
         # worker to task message updates
 
@@ -154,9 +154,12 @@ def worker_to_task():
             psi_k_j = [numpy.array([1-p, p])[::akj] for akj in akjs]
             e[2]['msg_w_t'][i] = (numpy.prod([numpy.dot(vkjs[k], psi_k_j[k]) for k in range(len(adj_task_nodes))]))
 
+        # normalising back to 1
+        e[2]['msg_w_t'] /= sum(e[2]['msg_w_t'])
+
 
 def task_to_worker():
-    print 'task to worker'
+    #print 'task to worker'
     for e in G.edges_iter(data=True):
         # task to worker message updates
 
@@ -174,6 +177,9 @@ def task_to_worker():
 
             # If they are equal, 1 else -1
             e[2]['msg_t_w'][i] = numpy.prod([numpy.dot(t_vals[(int(ti == aiks[l]))], vkis[l]) for l in range(len(adj_worker_nodes))])
+
+        # normalising back to 1
+        e[2]['msg_t_w'] /= sum(e[2]['msg_t_w'])
 
 
 def estimate_ti():
@@ -236,3 +242,12 @@ def evaluate_wj_estimates():
 
     w_act = numpy.array([worker.reliability for worker in workers])
 
+
+print 'before bp'
+evaluate_ti_estimates();
+
+for i in range(4):
+    print 'iteration - ' + str(i)
+    worker_to_task();
+    task_to_worker();
+    evaluate_ti_estimates();
